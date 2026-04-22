@@ -9,7 +9,7 @@ dynamodb = boto3.resource("dynamodb")
 s3 = boto3.client("s3")
 
 TABLE_NAME = "music_v3"
-BUCKET_NAME = "music-images-33"
+BUCKET_NAME = "s4198341-music-images"
 
 table = dynamodb.Table(TABLE_NAME)
 

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Main Page</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body onload="loadMainPage()">
+  <div class="container">
+    <div class="top-bar">
+      <h1>Music Subscription App</h1>
+      <a href="#" onclick="logout()">Logout</a>
+    </div>
+
+    <div class="card">
+      <h2>User Area</h2>
+      <p class="section-subtitle">Logged-in user details</p>
+      <p>Welcome, <span id="userName" class="user-badge"></span></p>
+    </div>
+
+        <div class="card">
+            <h2>Subscription Area</h2>
+            <p class="section-subtitle">Songs you have subscribed to</p>
+
+            <div id="subscriptionMessage" class="message-card success-card"></div>
+
+            <div id="subscriptionsContainer">
+                <p class="empty-state">No subscriptions yet.</p>
+            </div>
+            </div>
+
+    <div class="card">
+      <h2>Query Area</h2>
+      <p class="section-subtitle">Search by title, year, artist, album, or any combination</p>
+
+      <div class="query-grid">
+        <input type="text" id="queryTitle" placeholder="Title" />
+        <input type="text" id="queryYear" placeholder="Year" />
+        <input type="text" id="queryArtist" placeholder="Artist" />
+        <input type="text" id="queryAlbum" placeholder="Album" />
+      </div>
+
+      <div class="actions-row">
+        <button onclick="querySongs()">Query</button>
+      </div>
+
+      <div id="actionMessage" class="message-card success-card"></div>
+    <div id="queryMessage" class="message-card"></div>
+
+      <div id="resultsContainer">
+        <p class="empty-state">Your query results will appear here.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

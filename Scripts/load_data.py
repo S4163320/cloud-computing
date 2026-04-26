@@ -8,8 +8,8 @@ import requests
 dynamodb = boto3.resource("dynamodb")
 s3 = boto3.client("s3")
 
-TABLE_NAME = "music_v3"
-BUCKET_NAME = "s4198341-music-images"
+TABLE_NAME = "music_v4"
+BUCKET_NAME = "music-images-33" # change according to your bucket name
 
 table = dynamodb.Table(TABLE_NAME)
 

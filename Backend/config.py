@@ -1,5 +1,5 @@
 LOGIN_TABLE = "login_v2"
-MUSIC_TABLE = "music_v3"
-SUBSCRIPTIONS_TABLE = "subscriptions_v1"
-S3_BUCKET = "s4198341-music-images"
+MUSIC_TABLE = "music_v4"
+SUBSCRIPTIONS_TABLE = "subscriptions" 
+S3_BUCKET = "music-images-33" 
 AWS_REGION = "us-east-1"

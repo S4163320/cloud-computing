@@ -1,5 +1,5 @@
-const API_BASE = "http://127.0.0.1:5000";
-
+//const API_BASE = "http://18.212.146.231:5000"; //EC2
+const API_BASE = "https://tq99cxx1oc.execute-api.us-east-1.amazonaws.com/prod"; //Lambda
 
 
 function saveUser(user) {
@@ -142,10 +142,16 @@ function renderSongs(containerId, songs, isSubscription = false) {
       ${
         isSubscription
           ? `<button class="remove-btn" onclick="removeSubscription('${song.song_id}')">Remove</button>`
-          : `<button onclick='subscribeSong(${JSON.stringify(song)})'>Subscribe</button>`
+          : `<button onclick="subscribeSongEncoded('${encodeURIComponent(JSON.stringify(song))}')">Subscribe</button>`
       }
     </div>
   `).join("");
+}
+
+function subscribeSongEncoded(encodedSong) {
+  const song = JSON.parse(decodeURIComponent(encodedSong));
+  console.log("Subscribe clicked:", song);
+  subscribeSong(song);
 }
 
 async function loadSubscriptions() {
@@ -184,24 +190,29 @@ async function querySongs() {
 
 async function subscribeSong(song) {
   const user = getUser();
+  const songImageKey = song.img_url || song.image_key || song.s3_key || "";
 
   clearMessage("queryMessage");
   clearMessage("actionMessage");
 
+  const payload = {
+    email: user.email,
+    artist: song.artist,
+    title: song.title,
+    album: song.album,
+    year: song.year,
+    img_url: songImageKey
+  };
+  console.log("POST /subscriptions payload:", payload);
+
   const res = await fetch(`${API_BASE}/subscriptions`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      email: user.email,
-      artist: song.artist,
-      title: song.title,
-      album: song.album,
-      year: song.year,
-      img_url: song.img_url
-    })
+    body: JSON.stringify(payload)
   });
 
   const data = await res.json();
+  console.log("POST /subscriptions response:", data);
 
   if (data.success) {
     showMessage("actionMessage", "Song subscribed successfully", true);

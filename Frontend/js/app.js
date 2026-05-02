@@ -1,4 +1,4 @@
-//const API_BASE = "http://18.212.146.231:5000"; //EC2
+//const API_BASE = "http://184.72.170.126:5000"; //EC2
 const API_BASE = "https://tq99cxx1oc.execute-api.us-east-1.amazonaws.com/prod"; //Lambda
 
 

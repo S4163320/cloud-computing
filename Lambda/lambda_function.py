@@ -1,10 +1,9 @@
 """
-Standalone Lambda backend for API Gateway (REST API, Lambda proxy integration).
+Lambda version of our music app backend (for API Gateway + Lambda demo).
 
-Important:
-- This file is intentionally separate from the EC2 Flask backend.
-- Do not import Backend/app.py or Backend/config.py to avoid coupling.
-- Query is used first for indexed access patterns; Scan is only fallback.
+This is separate from the EC2 Flask app so we can deploy both ways for the assignment.
+We still talk to the same DynamoDB tables and S3 bucket — constants are copied here on purpose
+(so we don't import the Flask project files).
 """
 
 import json
@@ -13,6 +12,11 @@ from urllib.parse import unquote
 import boto3
 from boto3.dynamodb.conditions import Key
 
+# ---------------------------------------------------------------------------
+# AWS Setup
+#   Region, table names, bucket, and CORS headers for the browser.
+#   (Same values idea as the Flask app, just defined in this file.)
+# ---------------------------------------------------------------------------
 # Copied constants (kept local to Lambda to avoid touching EC2 backend files).
 AWS_REGION = "us-east-1"
 LOGIN_TABLE = "login_v2"
@@ -34,6 +38,10 @@ music_table = dynamodb.Table(MUSIC_TABLE)
 subscriptions_table = dynamodb.Table(SUBSCRIPTIONS_TABLE)
 
 
+# ---------------------------------------------------------------------------
+# Helper Functions
+#   Small pieces used by more than one route (JSON, query params, S3, music search).
+# ---------------------------------------------------------------------------
 def _response(status_code, data):
     return {
         "statusCode": status_code,
@@ -76,7 +84,7 @@ def _looks_like_s3_key(value):
 
 
 def _extract_image_key(item):
-    # Prefer explicit key fields, then img_url/image_url when they look like keys.
+    # Try the usual fields; skip anything that looks like a full http(s) URL.
     for field in ("image_key", "s3_key", "img_url", "image_url"):
         val = item.get(field)
         if isinstance(val, str) and _looks_like_s3_key(val):
@@ -156,11 +164,11 @@ def _enrich_songs(items):
         row = dict(item)
         image_key = _extract_image_key(row)
 
-        # Keep img_url for frontend subscribe payload compatibility.
+        # Frontend subscribe() still wants img_url to be the S3 key when possible.
         if image_key and not row.get("img_url"):
             row["img_url"] = image_key
 
-        # Keep existing URL if already present; otherwise generate presigned URL.
+        # If we already have a real http(s) image link, keep it; else use presign.
         existing_image_url = row.get("image_url", "")
         if isinstance(existing_image_url, str) and existing_image_url.startswith(("http://", "https://")):
             row["image_url"] = existing_image_url
@@ -173,17 +181,14 @@ def _enrich_songs(items):
 
 
 def _parse_subscriptions_delete_path(path, path_params):
-    # Primary: API Gateway path parameters.
+    # First try normal API Gateway path params.
     email = ""
     song_id = ""
     if path_params:
         email = path_params.get("email", "") or path_params.get("proxy", "")
         song_id = path_params.get("songId", "") or path_params.get("song_id", "")
 
-    # Fallback: manual parsing from full path.
-    # Expected path: /subscriptions/{email}/{songId}
-    # Song IDs can contain encoded special characters, so after "subscriptions"
-    # we treat next segment as email and join all remaining segments as song_id.
+    # If that failed, split the path by hand. song_id can have # and odd characters.
     if not email or not song_id:
         parts = [p for p in path.split("/") if p]
         if "subscriptions" in parts:
@@ -196,10 +201,14 @@ def _parse_subscriptions_delete_path(path, path_params):
 
 
 def _route_matches(path, suffix):
-    # Supports direct /login and staged paths like /prod/login.
+    # Works for /login and also /stage/login style paths.
     return path == suffix or path.endswith(suffix)
 
 
+# ---------------------------------------------------------------------------
+# Login Route
+#   POST /login
+# ---------------------------------------------------------------------------
 def _handle_login(event):
     data = _parse_body(event)
     email = str(data.get("email", "")).strip()
@@ -218,6 +227,10 @@ def _handle_login(event):
     )
 
 
+# ---------------------------------------------------------------------------
+# Register Route
+#   POST /register
+# ---------------------------------------------------------------------------
 def _handle_register(event):
     data = _parse_body(event)
     email = str(data.get("email", "")).strip()
@@ -237,6 +250,10 @@ def _handle_register(event):
     return _response(200, {"success": True, "message": "Registration successful"})
 
 
+# ---------------------------------------------------------------------------
+# Songs Route
+#   GET /songs?...  (Query when we can, Scan as backup — same idea as Flask.)
+# ---------------------------------------------------------------------------
 def _handle_songs(event):
     params = _get_query_params(event)
 
@@ -305,6 +322,10 @@ def _handle_songs(event):
     return _response(200, {"success": True, "songs": enriched})
 
 
+# ---------------------------------------------------------------------------
+# Subscription Routes
+#   GET/POST /subscriptions, DELETE /subscriptions/...
+# ---------------------------------------------------------------------------
 def _handle_get_subscriptions(event):
     params = _get_query_params(event)
     email = str(params.get("email", "")).strip()
@@ -365,6 +386,10 @@ def _handle_delete_subscription(event):
     return _response(200, {"success": True, "message": "Removed successfully"})
 
 
+# ---------------------------------------------------------------------------
+# Main Lambda Handler
+#   API Gateway sends httpMethod, path, body, etc. We route like a tiny web server.
+# ---------------------------------------------------------------------------
 def lambda_handler(event, context):
     method = (event.get("httpMethod") or "").upper()
     path = event.get("path") or ""

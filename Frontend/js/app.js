@@ -1,6 +1,37 @@
-const API_BASE = "http://127.0.0.1:5000";
+const BACKENDS = {
+    LOCAL: "http://127.0.0.1:5000",
+    EC2: "http://18.212.146.231:5000",
+    ECS: "http://musicAppBackEnd-alb-526401962.us-east-1.elb.amazonaws.com:5000",
+    LAMBDA: "https://tq99cxx1oc.execute-api.us-east-1.amazonaws.com/prod"
+};
 
+// Set the initial default
+let API_BASE = BACKENDS.LOCAL;
 
+function updateBackend() {
+    const selector = document.getElementById("backendSelect");
+    const selectedKey = selector.value; // This will be 'LOCAL', 'EC2', etc.
+    
+    // Update the API_BASE variable using the key from our object
+    API_BASE = BACKENDS[selectedKey];
+    
+    // Update the UI label so you can see the active URL
+    const label = document.getElementById("currentApiUrl");
+    if (label) label.textContent = API_BASE;
+    
+    console.log(`Switched to ${selectedKey} backend:`, API_BASE);
+    
+    // Refresh subscriptions to prove the connection works
+    if (getUser()) {
+        loadSubscriptions();
+    }
+}
+
+// Ensure the URL label is correct when the page first loads
+window.addEventListener('DOMContentLoaded', () => {
+    const label = document.getElementById("currentApiUrl");
+    if (label) label.textContent = API_BASE;
+});
 
 function saveUser(user) {
   localStorage.setItem("music_user", JSON.stringify(user));
@@ -142,10 +173,16 @@ function renderSongs(containerId, songs, isSubscription = false) {
       ${
         isSubscription
           ? `<button class="remove-btn" onclick="removeSubscription('${song.song_id}')">Remove</button>`
-          : `<button onclick='subscribeSong(${JSON.stringify(song)})'>Subscribe</button>`
+          : `<button onclick="subscribeSongEncoded('${encodeURIComponent(JSON.stringify(song))}')">Subscribe</button>`
       }
     </div>
   `).join("");
+}
+
+function subscribeSongEncoded(encodedSong) {
+  const song = JSON.parse(decodeURIComponent(encodedSong));
+  console.log("Subscribe clicked:", song);
+  subscribeSong(song);
 }
 
 async function loadSubscriptions() {
@@ -184,24 +221,29 @@ async function querySongs() {
 
 async function subscribeSong(song) {
   const user = getUser();
+  const songImageKey = song.img_url || song.image_key || song.s3_key || "";
 
   clearMessage("queryMessage");
   clearMessage("actionMessage");
 
+  const payload = {
+    email: user.email,
+    artist: song.artist,
+    title: song.title,
+    album: song.album,
+    year: song.year,
+    img_url: songImageKey
+  };
+  console.log("POST /subscriptions payload:", payload);
+
   const res = await fetch(`${API_BASE}/subscriptions`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      email: user.email,
-      artist: song.artist,
-      title: song.title,
-      album: song.album,
-      year: song.year,
-      img_url: song.img_url
-    })
+    body: JSON.stringify(payload)
   });
 
   const data = await res.json();
+  console.log("POST /subscriptions response:", data);
 
   if (data.success) {
     showMessage("actionMessage", "Song subscribed successfully", true);

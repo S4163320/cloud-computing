@@ -1,7 +1,7 @@
 import boto3
 
 dynamodb = boto3.resource("dynamodb")
-table_name = "subscriptions_v1"
+table_name = "subscriptions" # change according to your table name
 
 print("Creating subscriptions table...")
 

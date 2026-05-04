@@ -7,6 +7,29 @@
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+
+  <div class="container">
+  <div class="card backend-selector">
+          <!--Back End selection drop down -->
+      <h2>Environment Settings</h2>
+      <p class="section-subtitle">Switch between different cloud backends for the demo</p>
+      <div class="actions-row">
+        <label for="backendSelect"><strong>Active Backend:</strong></label>
+        <select id="backendSelect" onchange="updateBackend()">
+          <option value="LOCAL">Local Testing (Flask)</option>
+          <option value="EC2">EC2 Instance</option>
+          <option value="ECS" selected>ECS Fargate (Load Balancer)</option>
+          <option value="LAMBDA">AWS Lambda (API Gateway)</option>
+        </select>
+      </div>
+      <p class="section-subtitle">API Endpoint: <code id="currentApiUrl"></code></p>
+    </div>
+    <!-- END OF DROPDOWN -->
+  </div>
+</div>
+
+
+
   <div class="container">
     <div class="auth-box">
       <h1>Music Subscription App</h1>

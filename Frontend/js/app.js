@@ -1,7 +1,37 @@
-// const API_BASE = "http://18.212.146.231:5000"; //EC2
-// const API_BASE = "http://musicAppBackEnd-alb-526401962.us-east-1.elb.amazonaws.com:5000"; //ECS
-// const API_BASE = "https://tq99cxx1oc.execute-api.us-east-1.amazonaws.com/prod"; //Lambda
+const BACKENDS = {
+    LOCAL: "http://127.0.0.1:5000",
+    EC2: "http://18.212.146.231:5000",
+    ECS: "http://musicAppBackEnd-alb-526401962.us-east-1.elb.amazonaws.com:5000",
+    LAMBDA: "https://tq99cxx1oc.execute-api.us-east-1.amazonaws.com/prod"
+};
 
+// Set the initial default
+let API_BASE = BACKENDS.LOCAL;
+
+function updateBackend() {
+    const selector = document.getElementById("backendSelect");
+    const selectedKey = selector.value; // This will be 'LOCAL', 'EC2', etc.
+    
+    // Update the API_BASE variable using the key from our object
+    API_BASE = BACKENDS[selectedKey];
+    
+    // Update the UI label so you can see the active URL
+    const label = document.getElementById("currentApiUrl");
+    if (label) label.textContent = API_BASE;
+    
+    console.log(`Switched to ${selectedKey} backend:`, API_BASE);
+    
+    // Refresh subscriptions to prove the connection works
+    if (getUser()) {
+        loadSubscriptions();
+    }
+}
+
+// Ensure the URL label is correct when the page first loads
+window.addEventListener('DOMContentLoaded', () => {
+    const label = document.getElementById("currentApiUrl");
+    if (label) label.textContent = API_BASE;
+});
 
 function saveUser(user) {
   localStorage.setItem("music_user", JSON.stringify(user));

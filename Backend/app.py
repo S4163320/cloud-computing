@@ -160,62 +160,63 @@ def register():
 
 @app.route("/songs", methods=["GET"])
 def query_songs():
-    # Keep original-case values for DynamoDB Query because keys are case-sensitive.
-    title_raw = request.args.get("title", "").strip()
-    year_raw = request.args.get("year", "").strip()
+    # 1. Get raw inputs (for exact DynamoDB index matches)
     artist_raw = request.args.get("artist", "").strip()
+    year_raw = request.args.get("year", "").strip()
+    title_raw = request.args.get("title", "").strip()
     album_raw = request.args.get("album", "").strip()
 
-    # Normalize request values for Python-side filtering (case-insensitive).
-    title = title_raw.lower()
-    artist = artist_raw.lower()
-    album = album_raw.lower()
-    year = year_raw
+    # 2. Normalize for Python filtering (partial/case-insensitive match)
+    artist_norm = artist_raw.lower()
+    album_norm = album_raw.lower()
+    title_norm = title_raw.lower()
 
-    if not any([title, year, artist, album]):
+    if not any([artist_raw, year_raw, title_raw, album_raw]):
         return jsonify({"success": False, "message": "At least one field must be completed"}), 400
 
-    # Prefer Query on the base table, LSI, or GSI so DynamoDB returns a narrow
-    # partition (or key condition) instead of reading every item via Scan.
-    # Scan is only used when the search cannot be expressed with our keys
-    # (e.g. title-only or year-only).
     items = []
-    used_query = False
-    if artist_raw and year_raw:
-        items = _paginated_query(
-            IndexName="artist-year-index",
-            KeyConditionExpression=Key("artist").eq(artist_raw) & Key("year").eq(year_raw),
-        )
-        used_query = True
-    elif album_raw and year_raw:
-        items = _paginated_query(
-            IndexName="album-year-index",
-            KeyConditionExpression=Key("album").eq(album_raw) & Key("year").eq(year_raw),
-        )
-        used_query = True
-    elif artist_raw:
-        items = _paginated_query(
-            KeyConditionExpression=Key("artist").eq(artist_raw),
-        )
-        used_query = True
-    elif album_raw:
-        items = _paginated_query(
-            IndexName="album-year-index",
-            KeyConditionExpression=Key("album").eq(album_raw),
-        )
-        used_query = True
-    else:
+    
+    # Try high-speed Query first if keys are provided
+    try:
+        if artist_raw and year_raw:
+            items = _paginated_query(
+                IndexName="artist-year-index",
+                KeyConditionExpression=Key("artist").eq(artist_raw) & Key("year").eq(year_raw)
+            )
+        elif album_raw:
+            items = _paginated_query(
+                IndexName="album-year-index",
+                KeyConditionExpression=Key("album").eq(album_raw)
+            )
+        elif artist_raw:
+            items = _paginated_query(
+                KeyConditionExpression=Key("artist").eq(artist_raw)
+            )
+    except Exception:
+        pass # If query fails, we fall through to Scan
+
+    # 3. If Query found nothing (possibly due to partial name like 'Taylor'), 
+    # use Scan to find the partial match.
+    if not items:
         items = _paginated_scan()
 
-    # Query is preferred for efficiency, but DynamoDB key lookups are case-sensitive.
-    # If a Query path was used and returned no rows (e.g. case mismatch in artist/album),
-    # fallback to Scan so Python-side case-insensitive filters can still find matches.
-    if used_query and not items:
-        items = _paginated_scan()
+    # 4. Apply the final Python filter (Handles partial strings and case-insensitivity)
+    filtered = []
+    for item in items:
+        db_title = str(item.get("title", "")).lower()
+        db_artist = str(item.get("artist", "")).lower()
+        db_album = str(item.get("album", "")).lower()
+        db_year = str(item.get("year", ""))
 
-    filtered = _apply_song_filters(items, title, year, artist, album)
+        if title_norm and title_norm not in db_title: continue
+        if artist_norm and artist_norm not in db_artist: continue
+        if album_norm and album_norm not in db_album: continue
+        if year_raw and year_raw != db_year: continue
+        
+        filtered.append(item)
+
     enriched = _enrich_songs(filtered)
-
+    
     if not enriched:
         return jsonify({
             "success": False,
@@ -224,6 +225,7 @@ def query_songs():
         })
 
     return jsonify({"success": True, "songs": enriched})
+
 
 @app.route("/subscriptions", methods=["GET"])
 def get_subscriptions():
